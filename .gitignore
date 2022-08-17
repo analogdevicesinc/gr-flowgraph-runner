@@ -1,4 +1,5 @@
 android/assets/lib*
 android/libs*
+android/.gradle/*
 build_*
 *.user
