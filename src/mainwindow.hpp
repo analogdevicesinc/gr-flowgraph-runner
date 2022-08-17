@@ -3,10 +3,16 @@
 
 #include <QMainWindow>
 #include "Python.h"
+#include "pythoninterpreter.h"
+#include "pygrflow.h"
+#ifdef __ANDROID__
+#include <QAndroidJniEnvironment>
+#endif
 
 namespace Ui {
 class MainWindow;
 }
+
 
 class MainWindow : public QMainWindow
 {
@@ -16,41 +22,36 @@ public:
 	explicit MainWindow(QWidget *parent = nullptr);
 	~MainWindow();
 
-	int path_add_to_search_path(std::string path);
-
 private:
-	bool validateAndUpdate(QString fileName);
-	/*
-	 * 0 - Loaded
-	 * 1 - Updated (overwrite)
-	 * 2 - Saved As
-	 * 3 - Syntax Error
-	 * 4 - Modified
-	 */
-	void updateStatusLabel(int status_option);
+
 	void cleanup();
+    void initPythonInterpreter();
+    void registerNativeMethods();
+
+    int writeGrFlowPyFile();
+    QString getGrFlowPyClassName();
 
 private Q_SLOTS:
 	void onBtnStartFlowPressed();
 	void onBtnStopFlowPressed();
 	void onBtnBrowseClicked(bool clicked);
-	void onBtnOverwriteClicked(bool clicked);
-	void onBtnSaveAsClicked(bool clicked);
 	void onBtnInitPythonClicked(bool clicked);
-	void onTextScriptChanged();
-	void onUpdateUi();
+    void onBtnRunCmd();
+    void onBtnClearConsole();
 
 
 Q_SIGNALS:
 	void updateUi();
 private:
 	Ui::MainWindow *ui;
-	QString m_fullFileName;
-	QString m_moduleName;
-	QString m_dirName;
-	int m_current_status;
-	PyObject *pName, *pModule, *pClass, *pArgs, *pFunc, *pDict;
+    QList<QWidget*> flowWidgets;
+    PythonInterpreter *py;
+    PyGrFlow *flow;
 	bool m_init;
+#ifdef __ANDROID__
+    QAndroidJniEnvironment *jnienv;
+#endif
 };
+
 
 #endif // MAINWINDOW_H

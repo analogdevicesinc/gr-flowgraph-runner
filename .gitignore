@@ -1,0 +1,4 @@
+android/assets/lib*
+android/libs*
+build_*
+*.user

@@ -1,290 +1,229 @@
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
-#include <libm2k/contextbuilder.hpp>
-#include <libm2k/context.hpp>
+
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QDebug>
 #include <fstream>
 #include <sstream>
+#include <streambuf>
+#include <iostream>
+#include "pylogger.h"
+
+#if __ANDROID__
+#include <QtAndroidExtras/QtAndroid>
+#include <QtAndroidExtras/QAndroidJniEnvironment>
+#include <android/log.h>
+#endif
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
+#ifdef __ANDROID__
+#include <libusb.h>
+#endif
+
 using namespace std;
 MainWindow::MainWindow(QWidget *parent) :
-	QMainWindow(parent),
-	ui(new Ui::MainWindow),
-	m_current_status(0),
-	pName(nullptr),
-	pModule(nullptr),
-	pClass(nullptr),
-	pArgs(nullptr),
-	pFunc(nullptr),
-	pDict(nullptr),
-	m_init(false)
+    QMainWindow(parent),
+    ui(new Ui::MainWindow),
+    py(nullptr),
+    m_init(false)
+  #ifdef __ANDROID__
+  ,jnienv(new QAndroidJniEnvironment())
+  #endif
 {
-	ui->setupUi(this);
-	ui->textBrowseScript->setReadOnly(true);
-	connect(ui->btnBrowse, SIGNAL(clicked(bool)), this, SLOT(onBtnBrowseClicked(bool)));
-	connect(this, SIGNAL(updateUi()), this, SLOT(onUpdateUi()));
-	connect(ui->btnOverwrite, SIGNAL(clicked(bool)), this, SLOT(onBtnOverwriteClicked(bool)));
-	connect(ui->btnSaveAs, SIGNAL(clicked(bool)), this, SLOT(onBtnSaveAsClicked(bool)));
-	connect(ui->btnInitPython, SIGNAL(clicked(bool)), this, SLOT(onBtnInitPythonClicked(bool)));
-	connect(ui->textScript, SIGNAL(textChanged()), this, SLOT(onTextScriptChanged()));
-	connect(ui->btnStartFlow, SIGNAL(pressed()), this, SLOT(onBtnStartFlowPressed()));
-	connect(ui->btnStopFlow, SIGNAL(pressed()), this, SLOT(onBtnStopFlowPressed()));
+    ui->setupUi(this);
+    ui->classname->setReadOnly(true);
+    connect(ui->btnBrowse, SIGNAL(clicked(bool)), this, SLOT(onBtnBrowseClicked(bool)));
+    connect(ui->btnInitPython, SIGNAL(clicked(bool)), this, SLOT(onBtnInitPythonClicked(bool)));
+    connect(ui->btnStartFlow, SIGNAL(pressed()), this, SLOT(onBtnStartFlowPressed()));
+    connect(ui->btnStopFlow, SIGNAL(pressed()), this, SLOT(onBtnStopFlowPressed()));
+    connect(ui->btnRun,SIGNAL(pressed()),this,SLOT(onBtnRunCmd()));
+    connect(ui->btnClearConsole,SIGNAL(pressed()),this,SLOT(onBtnClearConsole()));
+
+#ifdef __ANDROID__ // LIBUSB WEAK_AUTHORITY
+    libusb_set_option(NULL,LIBUSB_OPTION_ANDROID_JAVAVM,jnienv->javaVM());
+    libusb_set_option(NULL,LIBUSB_OPTION_WEAK_AUTHORITY,NULL);
+#endif
+
+#ifdef __ANDROID__ // JNI hooks
+    registerNativeMethods();
+#endif
+
+#if __ANDROID__ // Permissions
+    const QVector<QString> permissions({"android.permission.READ_EXTERNAL_STORAGE",
+                                        "android.permission.MANAGE_EXTERNAL_STORAGE",
+                                        "android.permission.WRITE_EXTERNAL_STORAGE",
+                                        "android.permission.INTERNET"});
+
+    for(const QString &permission : permissions) {
+        auto result = QtAndroid::checkPermission(permission);
+        if(result == QtAndroid::PermissionResult::Denied) {
+            auto resultHash = QtAndroid::requestPermissionsSync(QStringList({permission}));
+            if(resultHash[permission] == QtAndroid::PermissionResult::Denied)
+                return;
+        }
+    }
+#endif
+
 }
 
-int MainWindow::path_add_to_search_path(std::string path)
-{
-	PyObject *py_cur_path, *py_item;
-	// TBD: PyGILPath for threads running in C
-	PyGILState_STATE gstate;
-	gstate = PyGILState_Ensure();
+int MainWindow::writeGrFlowPyFile() {
+    QByteArray content = ui->scriptEditor->toPlainText().toUtf8();
+    QString grFlowPyFile;
+#if __ANDROID__
+    grFlowPyFile = (qgetenv("PYTHONPATH")+"/grflow.py");
+    qDebug()<<grFlowPyFile;
+#else
+    grFlowPyFile = "./grflow.py";
+    QFileInfo f(grFlowPyFile);
+    py->addToSearchPath(".");
+    qDebug()<<f.absoluteFilePath();
+#endif
 
-	py_cur_path = PySys_GetObject("path");
-	if (!py_cur_path) {
-		qDebug() << "cannot check current python sys path\n";
-		PyGILState_Release(gstate);
-		return 1;
-	}
-
-	py_item = PyUnicode_FromString(path.c_str());
-	if (!py_item) {
-		qDebug() << "cannot save the new path into a py object\n";
-		PyGILState_Release(gstate);
-		return 1;
-	}
-
-	if (PyList_Insert(py_cur_path, 0, py_item) < 0) {
-		Py_DECREF(py_item);
-		qDebug() << "Failed to insert path to search path\n";
-		PyGILState_Release(gstate);
-		return 1;
-	}
-	Py_DECREF(py_item);
-	PyGILState_Release(gstate);
-
-	return 0;
+    QFile out(grFlowPyFile);
+    out.open(QIODevice::WriteOnly);
+    int ret = out.write(content);
+    out.flush();
+    out.close();
+    return ret;
 }
 
-bool MainWindow::validateAndUpdate(QString fileName)
-{
-	bool ok = true;
-	bool needsUpdate = false;
-	QFileInfo info(fileName);
-	if (info.isFile()) {
-		QString ext = info.completeSuffix();
-		if (ext != "py") {
-			// TBD err
-			ok = false;
-		}
-		if (fileName != m_fullFileName) {
-			m_fullFileName = fileName;
-			m_moduleName = info.completeBaseName();
-			m_dirName = info.absoluteDir().absolutePath();
-			needsUpdate = true;
-		}
-	} else {
-		ok = false;
-	}
-	if (ok && needsUpdate) {
-		Q_EMIT updateUi();
-	}
-	return ok;
+QString MainWindow::getGrFlowPyClassName() {
+    QByteArray content = ui->scriptEditor->toPlainText().toUtf8();
+    QStringList all = QString(content).split(" ",Qt::SkipEmptyParts);
+    int i=0;
+    for(i = 0;i<all.length();i++)
+    {
+        QString s = all[i];
+        if(s.endsWith("class"))
+        {
+            break;
+        }
+    }
+    i++;
+    qDebug()<<all[i];
+
+    int n = all[i].indexOf("(");
+    QString classname = all[i];
+    classname.truncate(n);
+    return classname;
 }
 
 void MainWindow::onBtnBrowseClicked(bool clicked)
 {
-	QString fileName = QFileDialog::getOpenFileName(this,
-	    tr("Browse Python script"), "", tr("Python script (*.py);;"), nullptr);
-
-	bool ok = validateAndUpdate(fileName);
+    QString s = QFileDialog::getOpenFileName(this,
+                                             tr("Browse Python script"), "", tr("Python script (*.py);;"), nullptr);
+    QFile file(s);    
+    file.open(QIODevice::ReadOnly);
+    QByteArray content = file.read(100000);
+    ui->scriptEditor->setText(content);
+    ui->classname->setText(getGrFlowPyClassName());
 }
 
-void MainWindow::onBtnOverwriteClicked(bool clicked)
-{
-	std::fstream file = std::fstream(m_fullFileName.toStdString(), std::ios::out);
-	if (!file.is_open()) {
-		// TBD err
-	}
-	file << ui->textScript->toPlainText().toStdString();
-	file.close();
-	updateStatusLabel(1);
-}
-
-void MainWindow::onBtnSaveAsClicked(bool clicked)
-{
-	QString fileName = QFileDialog::getSaveFileName(this,
-	    tr("Browse Python script"), "", tr("Python script (*.py);;"), nullptr);
-
-	bool ok = validateAndUpdate(fileName);
-	std::fstream file = std::fstream(m_fullFileName.toStdString(), std::ios::out);
-	if (!file.is_open()) {
-		// TBD err
-	}
-	// TBD: Should call emit to update the UI for this
-	file << ui->textScript->toPlainText().toStdString();
-	file.close();
-	updateStatusLabel(2);
-}
 
 void MainWindow::cleanup()
 {
-	if (pDict) {
-		Py_DECREF(pDict);
-	}
-	if (pFunc) {
-		Py_DECREF(pFunc);
-	}
-	if (pArgs) {
-		Py_DECREF(pArgs);
-	}
-	if (pClass) {
-		Py_DECREF(pClass);
-	}
-	if (pModule) {
-		Py_DECREF(pModule);
-	}
-	if (pName) {
-		Py_DECREF(pName);
-	}
-	if (m_init) {
-		Py_FinalizeEx();
-	}
+
+    for(QWidget *w : flowWidgets) {
+        PySys_WriteStdout("Deleting widgets\n");
+        w->deleteLater();
+        flowWidgets.removeAll(w);
+    }
+    /*if(py) {
+        PySys_WriteStdout("Deinit python interpreter\n");
+        delete flow;
+        delete py;
+    }*/
+
+}
+
+void MainWindow::initPythonInterpreter() {
+     // Initialize the Python interpreter
+     py = (new PythonInterpreter(this));
+     py->init();
+     py->setStdOutErrWidget(ui->scriptConsole);
+     PySys_WriteStdout("Python interpreter version: %s\n",(Py_GetVersion()));
+     PySys_WriteStdout("Python standard library path: %ls\n", (Py_GetPath()));
+
 }
 
 void MainWindow::onBtnInitPythonClicked(bool clicked)
 {
-	// clean up stuff if already initialized
-	cleanup();
+    // clean up stuff if already initialized
+    cleanup();
 
-	PyObject *result;
+    //QApplication *app = static_cast<QApplication *>(QApplication::instance());
+    initPythonInterpreter();
 
-	QApplication *app = static_cast<QApplication *>(QApplication::instance());
+    qDebug()<<writeGrFlowPyFile();
 
-	// Initialize the Python interpreter
-	Py_Initialize();
-	m_init = true;
-	qDebug() << "Python interpreter version:" << QString(Py_GetVersion());
-	qDebug() << "Python standard library path:" << QString::fromWCharArray(Py_GetPath());
-
-	// This should be called after initializing the interpreter
-	int ret = path_add_to_search_path(m_dirName.toStdString());
-
-	// This will define the name of the "module" - file without extension
-	pName = PyUnicode_FromString(m_moduleName.toStdString().c_str());
-
-	pModule = PyImport_Import(pName);
-
-	if (pModule != NULL) {
-	    //argv2 is the method name
-		pDict = PyModule_GetDict(pModule);
-		pClass = PyDict_GetItemString(pDict, "test"); //name of the python class
-
-		PyObject *pClassInstance = PyObject_CallObject(pClass, NULL);
-		if (pClassInstance == NULL) {
-			PyErr_Print();
-			return;
-		}
-
-		pArgs = PyTuple_New(1);
-		PyTuple_SetItem(pArgs, 0, pClassInstance);
+    QString _m_moduleName = "grflow";
+    flow = new PyGrFlow(py);
+    bool ret = flow->importGrFlow(_m_moduleName, ui->classname->toPlainText());
 
 
+    const QWidgetList &list = QApplication::topLevelWidgets();
+    for(QWidget * w : list){
+        if(w != this && w->parent() == nullptr) {
+            w->setParent(this);
+            ui->widgetGrcLayout->insertWidget(0, w);
+            flowWidgets.append(w);
+        }
+    }
+    if(ret) {
+        ui->tabWidget->setTabText(1, ui->classname->toPlainText());
+        ui->tabWidget->setCurrentIndex(1);
+    }
+    qDebug()<<"done";
 
-		pFunc = PyObject_GetAttrString(pClass, "show");
-		result = PyObject_CallObject(pFunc, pArgs);
-		if (result == NULL) {
-			PyErr_Print();
-		}
-
-
-		const QWidgetList &list = QApplication::topLevelWidgets();
-		for(QWidget * w : list){
-			if(w != this && w->parent() == nullptr) {
-				w->setParent(this);
-				ui->widgetGrcLayout->insertWidget(0, w);
-			}
-		}
-	} else {
-		PyErr_Print();
-	}
-}
-
-void MainWindow::onUpdateUi()
-{
-	ui->textBrowseScript->setText(m_fullFileName);
-	std::fstream file = std::fstream(m_fullFileName.toStdString(), std::ios::in);
-	if (!file.is_open()) {
-		// TBD err
-	}
-	std::stringstream buffer;
-	buffer << file.rdbuf();
-	file.close();
-	ui->textScript->setText(QString::fromStdString(buffer.str()));
-	updateStatusLabel(0);
-}
-
-void MainWindow::onTextScriptChanged()
-{
-	updateStatusLabel(4);
-}
-
-void MainWindow::updateStatusLabel(int status_option)
-{
-	if (status_option == m_current_status) {
-		return;
-	}
-	QString status = "File ";
-	switch (status_option) {
-	case 0:
-		status += "loaded";
-		break;
-	case 1:
-		status += "updated";
-		break;
-	case 2:
-		status += "saved as...";
-		break;
-	case 3:
-		status = "Syntax error";
-		break;
-	case 4:
-		status += "changed; not saved";
-		break;
-	default:
-		status = "";
-	}
-
-	ui->lblStatus->setText(status);
 }
 
 void MainWindow::onBtnStartFlowPressed()
 {
-	PyObject *result;
-	pFunc = PyObject_GetAttrString(pClass, "start");
-	result = PyObject_CallObject(pFunc, pArgs);
-	if (result == NULL) {
-		PyErr_Print();
-	}
+    qDebug()<<"start";
+    flow->callFunction("start");
 }
 
 void MainWindow::onBtnStopFlowPressed()
 {
-	PyObject *result;
-	// might need to call "wait" here after "stop"
-	pFunc = PyObject_GetAttrString(pClass, "stop");
-	result = PyObject_CallObject(pFunc, pArgs);
-	if (result == NULL) {
-		PyErr_Print();
-	}
+    qDebug()<<"stop";
+    flow->callFunction("stop");
+}
+
+void MainWindow::onBtnRunCmd() {
+
+    QTextCursor prev_cursor = ui->scriptConsole->textCursor();
+    ui->scriptConsole->append (">> "+ ui->scriptCommand->text()+"\n");
+    py->runSimpleString(ui->scriptCommand->text());
+}
+
+void MainWindow::onBtnClearConsole() {
+     ui->scriptConsole->clear();
 }
 
 MainWindow::~MainWindow()
 {
-	cleanup();
-	delete ui;
+    cleanup();
+    delete ui;
 }
+
+
+#ifdef __ANDROID__
+void MainWindow::registerNativeMethods()
+{
+    return;
+    JNINativeMethod methods[] = { };
+
+    QAndroidJniObject activity = QtAndroid::androidActivity();
+    QAndroidJniEnvironment env;
+    jclass objectClass = env->GetObjectClass(activity.object<jobject>());
+
+    env->RegisterNatives(objectClass,
+                         methods,
+                         sizeof(methods) / sizeof(methods[0]));
+    env->DeleteLocalRef(objectClass);
+}
+#endif
