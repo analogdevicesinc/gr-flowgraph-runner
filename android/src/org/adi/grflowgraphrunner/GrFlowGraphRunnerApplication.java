@@ -52,7 +52,9 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 		System.out.println("sourcedir: "+ getApplicationInfo().sourceDir);
 		System.out.println("public sourcedir: "+ getApplicationInfo().publicSourceDir);
 		String libdir = getApplicationInfo().nativeLibraryDir;
-		String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
+		String sdcard = Environment.getExternalStoragePublicDirectory(
+				Environment.DIRECTORY_DOCUMENTS).getAbsolutePath();
+		System.out.println("tests will be deployed to: " + sdcard);
 		System.out.println("native library dir:" + libdir);
 		System.out.println("applcation cache dir:" + cache);
 		System.out.println("datadir"+getApplicationInfo().dataDir);
@@ -79,7 +81,7 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 		if (!isInstalled()) {
 			System.out.println("Copying assets to " + cache);
 			copyAssetFolder(getAssets(), "lib/python3.10", cache+"/lib/python3.10");
-			copyAssetFolder(getAssets(), "test", sdcard + "/grflowgraphrunner/tests");
+			copyAssetFolder(getAssets(), "test", sdcard + "/Documents/grflowgraphrunner");
 
 			System.out.println("Setting installed flag " + cache);
 			//PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putBoolean("installed", true).commit();
