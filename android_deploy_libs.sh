@@ -24,9 +24,13 @@ copy-python() {
 	cp -R $DEV_PREFIX/lib/python3.10 ./android/assets/lib
 }
 
+strip-everything() {
+	find "android" -type f -name "*.so" -exec $STRIP {} \;
+}
 
 copy-all-libs-from-staging
 copy-missing-qt-libs
 copy-python
+strip-everything
 
 #$ANDROID_QT_DEPLOY --input $ARG1/android_deployment_settings.json --output $ARG1/android-build --android-platform android-$API --jdk $JDK --gradle --verbose --sign /home/adi/Downloads/scopy-android-key.jks
