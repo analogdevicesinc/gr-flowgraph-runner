@@ -36,6 +36,7 @@ import android.system.ErrnoException;
 
 import android.app.Application;
 import android.content.Context;
+import android.os.Environment;
 import android.content.res.AssetManager;
 import android.preference.PreferenceManager;
 
@@ -51,6 +52,7 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 		System.out.println("sourcedir: "+ getApplicationInfo().sourceDir);
 		System.out.println("public sourcedir: "+ getApplicationInfo().publicSourceDir);
 		String libdir = getApplicationInfo().nativeLibraryDir;
+		String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
 		System.out.println("native library dir:" + libdir);
 		System.out.println("applcation cache dir:" + cache);
 		System.out.println("datadir"+getApplicationInfo().dataDir);
@@ -75,29 +77,17 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 
 		clearInstalled();
 		if (!isInstalled()) {
-			    System.out.println("Copying assets to " + cache);
-			    copyAssetFolder(getAssets(), "lib/python3.10",
-				    cache+"/lib/python3.10");
-			    System.out.println("Setting installed flag " + cache);
-			    //PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putBoolean("installed", true).commit();
-			    //setInstalled();
-			}
-		    else {
-			System.out.println("Already installed");
-			}
+			System.out.println("Copying assets to " + cache);
+			copyAssetFolder(getAssets(), "lib/python3.10", cache+"/lib/python3.10");
+			copyAssetFolder(getAssets(), "test", sdcard + "/grflowgraphrunner/tests");
 
-			String[] pathnames;
-			File f = new File(cache+"/lib/python3.10/site-packages/gnuradio/analog");
-			// Populates the array with names of files and directories
-			pathnames = f.list();
-			// For each pathname in the pathnames array
-			 for (String pathname : pathnames) {
-			       // Print the names of files and directories
-			       System.out.println(pathname);
-			       }
-			   //String toLoad=cache+"/python3.10/site-packages/gnuradio/analog/analog_python.cpython-310.so";
-			   String toLoad=libdir+"/libgnuradio-analog.so";
-			   System.out.println(toLoad);
+			System.out.println("Setting installed flag " + cache);
+			//PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putBoolean("installed", true).commit();
+			//setInstalled();
+		} else {
+			System.out.println("Already installed");
+		}
+
 
 	}
 
@@ -118,26 +108,30 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 
 	private static boolean copyAssetFolder(AssetManager assetManager,
 		String fromAssetPath, String toPath) {
+
 	    try {
-		String[] files = assetManager.list(fromAssetPath);
-		new File(toPath).mkdirs();
-		System.out.println("toPath " + toPath);
-		boolean res = true;
-		for (String file : files)
-		    if (file.contains("."))
-			res &= copyAsset(assetManager,
-				fromAssetPath + "/" + file,
-				toPath + "/" + file);
-		    else
-			res &= copyAssetFolder(assetManager,
-				fromAssetPath + "/" + file,
-				toPath + "/" + file);
-		return res;
-	    } catch (Exception e) {
-		e.printStackTrace();
-		return false;
-	    }
+			String[] files = assetManager.list(fromAssetPath);
+			new File(toPath).mkdirs();
+			System.out.println("toPath " + toPath);
+			boolean res = true;
+			for (String file : files) {
+				if (file.contains(".")) {
+				res &= copyAsset(assetManager,
+					fromAssetPath + "/" + file,
+					toPath + "/" + file);
+				} else {
+				res &= copyAssetFolder(assetManager,
+					fromAssetPath + "/" + file,
+					toPath + "/" + file);
+				}
+			}
+			return res;
+		}catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}		
 	}
+	
 
 	private static boolean copyAsset(AssetManager assetManager,
 		String fromAssetPath, String toPath) {
@@ -156,16 +150,16 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 	      out.close();
 	      out = null;
 	      if(toPath.endsWith(".so")) {
-		  System.out.println("Making " + toPath + "executable !");
-		  File f = new File(toPath);
-		  f.setReadable(true, false);
-		  f.setExecutable(true, false);
-		  f.setWritable(true, false);
+			System.out.println("Making " + toPath + "executable !");
+			File f = new File(toPath);
+			f.setReadable(true, false);
+			f.setExecutable(true, false);
+			f.setWritable(true, false);
 		  }
 	      return true;
 	    } catch(Exception e) {
-		e.printStackTrace();
-		return false;
+			e.printStackTrace();
+			return false;
 	    }
 	}
 
