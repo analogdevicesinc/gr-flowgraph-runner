@@ -27,7 +27,7 @@ if(ANDROID)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
 endif()
 
-find_package(Qt5 COMPONENTS Core Widgets Gui Concurrent Network Qml Svg UiTools Xml LinguistTools OpenGL REQUIRED PATHS $ENV{Qt5_HOME})
+find_package(Qt5 COMPONENTS Core Widgets Gui Concurrent OpenGL REQUIRED PATHS $ENV{Qt5_HOME})
 
 if(ANDROID)
         find_package(Qt5AndroidExtras REQUIRED)
@@ -80,15 +80,10 @@ endif()
 
 
 target_link_libraries(${PROJECT_NAME} LINK_PRIVATE
-		Qt${QT_MAJOR_VERSION}::Widgets
-		Qt${QT_MAJOR_VERSION}::Gui
-		Qt${QT_MAJOR_VERSION}::Concurrent
-		Qt${QT_MAJOR_VERSION}::Qml
-		Qt${QT_MAJOR_VERSION}::UiTools
-		Qt${QT_MAJOR_VERSION}::Network
-		Qt${QT_MAJOR_VERSION}::Svg
-		Qt${QT_MAJOR_VERSION}::Xml
-		Qt${QT_MAJOR_VERSION}::OpenGL
+		Qt5::Widgets
+		Qt5::Gui
+		Qt5::Concurrent
+		Qt5::OpenGL
 		${PYTHON_LIBRARIES}
 		${QWT_LIBRARIES}
 
