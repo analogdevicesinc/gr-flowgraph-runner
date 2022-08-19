@@ -95,21 +95,36 @@ QString MainWindow::getGrFlowPyClassName() {
     QByteArray content = ui->scriptEditor->toPlainText().toUtf8();
     QStringList all = QString(content).split(" ",Qt::SkipEmptyParts);
     int i=0;
+    QString classname;
     for(i = 0;i<all.length();i++)
     {
         QString s = all[i];
-        if(s.endsWith("class"))
+        if(s.contains("top_block_cls"))
         {
+            int first = s.indexOf('=');
+            int last = s.indexOf(',');
+            qDebug()<<s<<first<<last;
+            classname = s.mid(first+1, last-first-1);
             break;
         }
-    }
-    i++;
+    }    
     qDebug()<<all[i];
 
-    int n = all[i].indexOf("(");
-    QString classname = all[i];
-    classname.truncate(n);
     return classname;
+}
+
+QString patchAudioToGrand(QString content) {
+    content.replace("from gnuradio import audio", "\
+from gnuradio import grand\n\
+# patchAudioToGrand: replaces audio sink blocks with opensl blocks\n\
+class audio:\n\
+  def sink(sample_rate, *args):\n\
+    return grand.opensl_sink(sample_rate)\n\
+  def source(sample_rate, *args):\n\
+    return grand.opensl_source(sample_rate)\n\
+\n\
+");
+    return content;
 }
 
 void MainWindow::onBtnBrowseClicked(bool clicked)
@@ -118,8 +133,12 @@ void MainWindow::onBtnBrowseClicked(bool clicked)
                                              tr("Browse Python script"), "", tr("Python script (*.py);;"), nullptr);
     QFile file(s);    
     file.open(QIODevice::ReadOnly);
-    QByteArray content = file.read(100000);
-    ui->scriptEditor->setText(content);
+    QByteArray content = file.read(1000000);
+    QString strContent = content;
+    if(ui->chkboxAudioPatch->isChecked()) {
+        strContent = patchAudioToGrand(strContent);
+    }
+    ui->scriptEditor->setText(strContent);
     ui->classname->setText(getGrFlowPyClassName());
 }
 
