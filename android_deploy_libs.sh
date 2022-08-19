@@ -21,16 +21,22 @@ copy-missing-qt-libs() {
 }
 
 copy-python() {
-	cp -R $DEV_PREFIX/lib/python3.10 ./android/assets/lib
+	mkdir -p ./android/assets/lib/python3.8
+	cp -R $DEV_PREFIX/lib/python3.8/* ./android/assets/lib/python3.8
 }
 
 strip-everything() {
 	find "android" -type f -name "*.so" -exec $STRIP {} \;
 }
+remove-cache() {
+	find "android" -type f -name "*__pycache*" -exec rm -rf {} \;
+	
+}
 
 copy-all-libs-from-staging
 copy-missing-qt-libs
 copy-python
-strip-everything
+#strip-everything
+remove-cache
 
 #$ANDROID_QT_DEPLOY --input $ARG1/android_deployment_settings.json --output $ARG1/android-build --android-platform android-$API --jdk $JDK --gradle --verbose --sign /home/adi/Downloads/scopy-android-key.jks

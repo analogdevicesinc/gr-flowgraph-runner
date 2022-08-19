@@ -63,7 +63,7 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 
 		try {
 		    Os.setenv("PYTHONHOME",cache,true);
-		    Os.setenv("PYTHONPATH",cache + "/lib/python3.10",true);
+		    Os.setenv("PYTHONPATH",cache + "/lib/python3.8",true);
 		    Os.setenv("SIGROKDECODE_DIR", apk + "/assets/libsigrokdecode/decoders",true);
 		    Os.setenv("APPDATA", cache, true);
 		    Os.setenv("PYFILE", apk + "/assets/untitled.py",true);
@@ -80,8 +80,8 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 		clearInstalled();
 		if (!isInstalled()) {
 			System.out.println("Copying assets to " + cache);
-			copyAssetFolder(getAssets(), "lib/python3.10", cache+"/lib/python3.10");
-			copyAssetFolder(getAssets(), "test", sdcard + "/Documents/grflowgraphrunner");
+			copyAssetFolder(getAssets(), "lib/python3.8", cache+"/lib/python3.8");
+			copyAssetFolder(getAssets(), "test", sdcard + "/grflowgraphrunner");
 
 			System.out.println("Setting installed flag " + cache);
 			//PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putBoolean("installed", true).commit();
