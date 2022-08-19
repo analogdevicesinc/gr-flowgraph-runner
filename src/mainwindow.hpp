@@ -27,6 +27,7 @@ private:
 	void cleanup();
     void initPythonInterpreter();
     void registerNativeMethods();
+    void requestAndroidPermissions();
 
     int writeGrFlowPyFile();
     QString getGrFlowPyClassName();

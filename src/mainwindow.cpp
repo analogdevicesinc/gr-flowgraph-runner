@@ -51,23 +51,33 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifdef __ANDROID__ // JNI hooks
     registerNativeMethods();
 #endif
+requestAndroidPermissions();
+}
 
+void MainWindow::requestAndroidPermissions() {
 #if __ANDROID__ // Permissions
-    const QVector<QString> permissions({"android.permission.READ_EXTERNAL_STORAGE",
-                                        "android.permission.MANAGE_EXTERNAL_STORAGE",
-                                        "android.permission.WRITE_EXTERNAL_STORAGE",
-                                        "android.permission.INTERNET"});
+    const QStringList permissions({"android.permission.WRITE_EXTERNAL_STORAGE",
+                                   "android.permission.READ_EXTERNAL_STORAGE",
+                                   "android.permission.RECORD_AUDIO",
+                                   "android.permission.CAPTURE_AUDIO_OUTPUT",
+                                   "android.permission.MODIFY_AUDIO_SETTINGS",
+                                   "android.permission.MANAGE_EXTERNAL_STORAGE",
+                                   "android.permission.INTERNET"});
 
     for(const QString &permission : permissions) {
         auto result = QtAndroid::checkPermission(permission);
+        qDebug()<<"Permission: " << permission << " state "  << bool(result) ;
         if(result == QtAndroid::PermissionResult::Denied) {
-            auto resultHash = QtAndroid::requestPermissionsSync(QStringList({permission}));
+            auto resultHash = QtAndroid::requestPermissionsSync(permissions);
             if(resultHash[permission] == QtAndroid::PermissionResult::Denied)
-                return;
+                qDebug()<<"Permission " <<permission << "Denied";
+            else
+                qDebug()<<"Permission " << permission << "Approved";
         }
+        else
+            qDebug()<<"Permission " << permission << "Approved";
     }
 #endif
-
 }
 
 int MainWindow::writeGrFlowPyFile() {
