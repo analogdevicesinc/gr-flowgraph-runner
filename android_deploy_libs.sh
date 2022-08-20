@@ -30,6 +30,8 @@ strip-everything() {
 }
 remove-cache() {
 	find "android" -type f -name "*__pycache*" -exec rm -rf {} \;
+	find "android" -type f -name "*.pyc" -exec rm -rf {} \;
+	find "android" -type f -name "*.pyo" -exec rm -rf {} \;
 	
 }
 

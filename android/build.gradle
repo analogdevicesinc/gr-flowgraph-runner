@@ -84,6 +84,7 @@ android {
 
     // Do not compress Qt binary resources file
     aaptOptions {
+	ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         noCompress 'rcc'
     }
 
