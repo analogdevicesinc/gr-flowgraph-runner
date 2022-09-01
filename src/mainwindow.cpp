@@ -76,9 +76,15 @@ void MainWindow::getSettings() {
 #define DEFAULT_PATCH_AUDIO false
 #endif
 
+#ifdef __ANDROID__
+#define DEFAULT_PATCH_ROOT "/sdcard/Downloads/"
+#else
+#define DEFAULT_PATCH_ROOT ""
+#endif
+
      ui->chkboxAudioPatch->setChecked(settings.value(ui->chkboxAudioPatch->objectName(), DEFAULT_PATCH_AUDIO).toBool());
      ui->chkboxReplaceURI->setChecked(settings.value(ui->chkboxReplaceURI->objectName(), false).toBool());
-     ui->chkboxReplaceRoot->setChecked(settings.value(ui->chkboxReplaceRoot->objectName(), false).toBool());
+     ui->chkboxReplaceRoot->setChecked(settings.value(ui->chkboxReplaceRoot->objectName(), DEFAULT_PATCH_ROOT).toBool());
      ui->lineeditRoot->setText(settings.value(ui->lineeditRoot->objectName(), "").toString());
      ui->lineeditUri->setText(settings.value(ui->lineeditUri->objectName(), "").toString());
 }
