@@ -3,6 +3,7 @@
 #include <QDebug>
 
 PyGrFlow::PyGrFlow( PythonInterpreter *py) :
+    started(false),
     pName(nullptr),
     pModule(nullptr),
     pClass(nullptr),
@@ -48,10 +49,17 @@ bool PyGrFlow::callFunction(QString str) {
 
 bool PyGrFlow::importGrFlow(QString str, QString classname) {
     QString _m_moduleName = str;
-
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
     pName = PyUnicode_FromString(_m_moduleName.toStdString().c_str());
 
-    pModule = PyImport_Import(pName);
+    if(pModule){
+        PyObject *m = pModule;
+        Py_DECREF(m);
+        pModule = PyImport_ReloadModule(pModule);
+    }  else {
+        pModule = PyImport_Import(pName);
+    }
 
     if (pModule != NULL) {
         //argv2 is the method name
@@ -76,5 +84,6 @@ bool PyGrFlow::importGrFlow(QString str, QString classname) {
         pylogger_printError();
         return false;
     }
+    PyGILState_Release(gstate);
     return true;
 }

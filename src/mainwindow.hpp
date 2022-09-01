@@ -9,6 +9,11 @@
 #include <QAndroidJniEnvironment>
 #endif
 
+#define ORG_NAME "ADI"
+#define ORG_DOMAIN "analog.com"
+#define APP_NAME "Gnuradio FlowGraph Runner"
+#define SCRIPT_LENGTH_IN_BYTES 10000000
+
 namespace Ui {
 class MainWindow;
 }
@@ -30,16 +35,18 @@ private:
     void requestAndroidPermissions();
 
     int writeGrFlowPyFile();
+    void readGrFlowPyFile();
     QString getGrFlowPyClassName();
 
 private Q_SLOTS:
-	void onBtnStartFlowPressed();
-	void onBtnStopFlowPressed();
+    void onBtnStartStopFlowPressed();
 	void onBtnBrowseClicked(bool clicked);
 	void onBtnInitPythonClicked(bool clicked);
     void onBtnRunCmd();
     void onBtnClearConsole();
 
+    void getSettings();
+    void saveSettings();
 
 Q_SIGNALS:
 	void updateUi();

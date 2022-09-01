@@ -5,6 +5,7 @@
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QDebug>
+#include <QSettings>
 #include <fstream>
 #include <sstream>
 #include <streambuf>
@@ -33,15 +34,25 @@ MainWindow::MainWindow(QWidget *parent) :
   #ifdef __ANDROID__
   ,jnienv(new QAndroidJniEnvironment())
   #endif
-{
+{    
+
+    QSettings settings;
     ui->setupUi(this);
     ui->classname->setReadOnly(true);
     connect(ui->btnBrowse, SIGNAL(clicked(bool)), this, SLOT(onBtnBrowseClicked(bool)));
     connect(ui->btnInitPython, SIGNAL(clicked(bool)), this, SLOT(onBtnInitPythonClicked(bool)));
-    connect(ui->btnStartFlow, SIGNAL(pressed()), this, SLOT(onBtnStartFlowPressed()));
-    connect(ui->btnStopFlow, SIGNAL(pressed()), this, SLOT(onBtnStopFlowPressed()));
+    connect(ui->btnStartStopFlow, SIGNAL(pressed()), this, SLOT(onBtnStartStopFlowPressed()));
     connect(ui->btnRun,SIGNAL(pressed()),this,SLOT(onBtnRunCmd()));
     connect(ui->btnClearConsole,SIGNAL(pressed()),this,SLOT(onBtnClearConsole()));
+
+    getSettings();
+
+    connect(ui->chkboxAudioPatch,SIGNAL(stateChanged(int)),this,SLOT(saveSettings()));
+    connect(ui->chkboxReplaceURI,SIGNAL(stateChanged(int)),this,SLOT(saveSettings()));
+    connect(ui->chkboxReplaceRoot,SIGNAL(stateChanged(int)),this,SLOT(saveSettings()));
+    connect(ui->lineeditRoot,SIGNAL(editingFinished()),this,SLOT(saveSettings()));
+    connect(ui->lineeditUri,SIGNAL(editingFinished()),this,SLOT(saveSettings()));
+
 
 #ifdef __ANDROID__ // LIBUSB WEAK_AUTHORITY
     libusb_set_option(NULL,LIBUSB_OPTION_ANDROID_JAVAVM,jnienv->javaVM());
@@ -51,8 +62,36 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifdef __ANDROID__ // JNI hooks
     registerNativeMethods();
 #endif
-requestAndroidPermissions();
+    requestAndroidPermissions();
+    readGrFlowPyFile();
+    ui->classname->setText(getGrFlowPyClassName());
 }
+
+void MainWindow::getSettings() {
+    QSettings settings;
+
+#ifdef __ANDROID__
+#define DEFAULT_PATCH_AUDIO true
+#else
+#define DEFAULT_PATCH_AUDIO false
+#endif
+
+     ui->chkboxAudioPatch->setChecked(settings.value(ui->chkboxAudioPatch->objectName(), DEFAULT_PATCH_AUDIO).toBool());
+     ui->chkboxReplaceURI->setChecked(settings.value(ui->chkboxReplaceURI->objectName(), false).toBool());
+     ui->chkboxReplaceRoot->setChecked(settings.value(ui->chkboxReplaceRoot->objectName(), false).toBool());
+     ui->lineeditRoot->setText(settings.value(ui->lineeditRoot->objectName(), "").toString());
+     ui->lineeditUri->setText(settings.value(ui->lineeditUri->objectName(), "").toString());
+}
+
+void MainWindow::saveSettings() {
+    QSettings settings;
+    settings.setValue(ui->chkboxAudioPatch->objectName(),ui->chkboxAudioPatch->isChecked());
+    settings.setValue(ui->chkboxReplaceURI->objectName(),ui->chkboxReplaceURI->isChecked());
+    settings.setValue(ui->chkboxReplaceRoot->objectName(),ui->chkboxReplaceRoot->isChecked());
+    settings.setValue(ui->lineeditRoot->objectName(),ui->lineeditRoot->text());
+    settings.setValue(ui->lineeditUri->objectName(),ui->lineeditUri->text());
+}
+
 
 void MainWindow::requestAndroidPermissions() {
 #if __ANDROID__ // Permissions
@@ -78,6 +117,25 @@ void MainWindow::requestAndroidPermissions() {
             qDebug()<<"Permission " << permission << "Approved";
     }
 #endif
+}
+
+
+void MainWindow::readGrFlowPyFile() {
+    QString grFlowPyFile;
+#if __ANDROID__
+    grFlowPyFile = (qgetenv("PYTHONPATH")+"/grflow.py");
+    qDebug()<<grFlowPyFile;
+#else
+    grFlowPyFile = "./grflow.py";
+    QFileInfo f(grFlowPyFile);
+    qDebug()<<f.absoluteFilePath();
+#endif
+
+    QFile in(grFlowPyFile);
+    in.open(QIODevice::ReadOnly);
+    ui->scriptEditor->setText(in.read(SCRIPT_LENGTH_IN_BYTES));
+    in.close();
+
 }
 
 int MainWindow::writeGrFlowPyFile() {
@@ -118,7 +176,7 @@ QString MainWindow::getGrFlowPyClassName() {
             break;
         }
     }    
-    qDebug()<<all[i];
+
 
     return classname;
 }
@@ -137,16 +195,26 @@ class audio:\n\
     return content;
 }
 
+QString replaceVariable(QString variable, QString replacement, QString content) {
+    return content.replace("self."+variable+" = "+variable+" = ", "self."+variable+" = "+variable+" = \""+replacement+ "\" #");
+}
+
 void MainWindow::onBtnBrowseClicked(bool clicked)
 {
     QString s = QFileDialog::getOpenFileName(this,
                                              tr("Browse Python script"), "", tr("Python script (*.py);;"), nullptr);
     QFile file(s);    
     file.open(QIODevice::ReadOnly);
-    QByteArray content = file.read(1000000);
+    QByteArray content = file.read(SCRIPT_LENGTH_IN_BYTES);
     QString strContent = content;
     if(ui->chkboxAudioPatch->isChecked()) {
         strContent = patchAudioToGrand(strContent);
+    }
+    if(ui->chkboxReplaceURI->isChecked()) {
+        strContent = replaceVariable("uri",ui->lineeditUri->text(),strContent);
+    }
+    if(ui->chkboxReplaceRoot->isChecked()) {
+        strContent = replaceVariable("root",ui->lineeditRoot->text(),strContent);
     }
     ui->scriptEditor->setText(strContent);
     ui->classname->setText(getGrFlowPyClassName());
@@ -210,16 +278,21 @@ void MainWindow::onBtnInitPythonClicked(bool clicked)
 
 }
 
-void MainWindow::onBtnStartFlowPressed()
+void MainWindow::onBtnStartStopFlowPressed()
 {
-    qDebug()<<"start";
-    flow->callFunction("start");
-}
-
-void MainWindow::onBtnStopFlowPressed()
-{
-    qDebug()<<"stop";
-    flow->callFunction("stop");
+    if(flow->started) {
+        qDebug()<<"stop";
+        flow->callFunction("stop");
+        ui->btnStartStopFlow->setText("Start");
+        flow->started = false;
+    }
+        else
+    {
+        qDebug()<<"start";
+        flow->callFunction("start");
+        ui->btnStartStopFlow->setText("Stop");
+        flow->started = true;
+    }
 }
 
 void MainWindow::onBtnRunCmd() {

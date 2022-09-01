@@ -12,6 +12,7 @@ public:
     ~PyGrFlow();
     bool callFunction(QString str);
     bool importGrFlow(QString str, QString classname);
+    bool started;
 
 private:
     PyObject *pName, *pModule, *pClass, *pArgs, *pFunc, *pDict;

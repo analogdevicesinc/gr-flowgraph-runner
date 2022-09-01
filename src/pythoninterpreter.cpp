@@ -1,6 +1,7 @@
 #include "pythoninterpreter.h"
 #include "pylogger.h"
 #include <QDebug>
+#include <QFileInfo>
 
 PythonInterpreter::PythonInterpreter(QObject *parent) :
     QObject(parent),
@@ -17,6 +18,12 @@ void PythonInterpreter::init() {
     Py_InitializeEx(0);
     PyImport_ImportModule("pycustomlogger");
 
+#ifndef __ANDROID__
+    QString grFlowPyFile = "./grflow.py";
+    QFileInfo f(grFlowPyFile);
+    addToSearchPath(".");
+    qDebug()<<f.absoluteFilePath();
+#endif
     m_init = true;
 
 }

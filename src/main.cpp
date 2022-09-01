@@ -9,9 +9,9 @@
 int main(int argc, char **argv)
 {
 	QApplication app(argc, argv);
-	QCoreApplication::setOrganizationName("ADI");
-	QCoreApplication::setOrganizationDomain("analog.com");
-	QCoreApplication::setApplicationName("qt-test");
+    QCoreApplication::setOrganizationName(ORG_NAME);
+    QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
+    QCoreApplication::setApplicationName(APP_NAME);
 
 	MainWindow *mainwin = new MainWindow(nullptr);
 	mainwin->show();
