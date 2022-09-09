@@ -43,6 +43,7 @@ import android.preference.PreferenceManager;
 
 public class GrFlowGraphRunnerApplication extends QtApplication
 {
+	boolean reloadLibs = false;
 	@Override
 	public void onCreate()
 	{
@@ -74,14 +75,16 @@ public class GrFlowGraphRunnerApplication extends QtApplication
 
 		super.onCreate();
 
-		clearInstalled();
+		if(reloadLibs) {
+		    clearInstalled();
+		}
+
 		if (!isInstalled()) {
 			System.out.println("Copying assets to " + cache);
 			copyAssetFolder(getAssets(), "lib/python3.8", cache+"/lib/python3.8");			
 
 			System.out.println("Setting installed flag " + cache);
-			//PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putBoolean("installed", true).commit();
-			//setInstalled();
+			setInstalled();
 		} else {
 			System.out.println("Already installed");
 		}

@@ -54,9 +54,9 @@ bool PyGrFlow::importGrFlow(QString str, QString classname) {
     pName = PyUnicode_FromString(_m_moduleName.toStdString().c_str());
 
     if(pModule){
-        PyObject *m = pModule;
-        Py_DECREF(m);
+        PyObject *m = pModule;        
         pModule = PyImport_ReloadModule(pModule);
+        Py_DECREF(m);
     }  else {
         pModule = PyImport_Import(pName);
     }

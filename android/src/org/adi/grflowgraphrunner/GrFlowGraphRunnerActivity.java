@@ -47,69 +47,15 @@ import android.os.PowerManager.WakeLock;
 
 
 public class GrFlowGraphRunnerActivity extends QtActivity
-{
-	public static native void saveSessionJavaHelper();
-	public static native void saveAndStopRunningToolsJNI();
-	public static native void saveAndStopRunningInputToolsJNI();
-	public static native void restoreRunningToolsJNI();
-	public static native int nrOfToolsSavedJNI();
-	public static native int nrOfToolsRunningJNI();
-	public static native boolean hasCtxJNI();
-	private static final int GRFLOWGRAPHRUNNER_WAKELOCK_NOTIFICATION_ID = 1;
-	private static final String GRFLOWGRAPHRUNNER_NOTIFICATION_CHANNEL_ID = "GrFlowGraphRunner";
+{	
 	boolean initialized;
-	private WakeLock wakeLock;
-
-
-	private void createNotificationChannel() {
-	    // Create the NotificationChannel, but only on API 26+ because
-	    // the NotificationChannel class is new and not in the support library
-
-	        CharSequence name = "GrFlowGraphRunner notifications";
-		String description = "Various messages from GrFlowGraphRunner";
-		int importance = NotificationManager.IMPORTANCE_DEFAULT;
-		NotificationChannel scopyNotificationChannel = new NotificationChannel(GRFLOWGRAPHRUNNER_NOTIFICATION_CHANNEL_ID, name, importance);
-		scopyNotificationChannel.setDescription(description);
-		// Register the channel with the system; you can't change the importance
-		// or other notification behaviors after this
-		NotificationManager notificationManager = getSystemService(NotificationManager.class);
-		notificationManager.createNotificationChannel(scopyNotificationChannel);
-
-	}
-
-        public void createNotification(String message)
-	{
-		NotificationManager notificationManager = (NotificationManager) getSystemService(NotificationManager.class);
-		createNotificationChannel();
-
-		Intent notificationIntent = new Intent(this, GrFlowGraphRunnerActivity.class);
-		notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-		PendingIntent openAppOnTapIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
-
-		Notification notification = new Notification.Builder(this,GRFLOWGRAPHRUNNER_NOTIFICATION_CHANNEL_ID)
-		        //.setSmallIcon(R.drawable.icon)
-			.setContentText(message)
-			.setPriority(Notification.PRIORITY_DEFAULT)
-			.setContentIntent(openAppOnTapIntent)
-			.setOngoing(true)
-			.build();
-
-		notificationManager.notify(GRFLOWGRAPHRUNNER_WAKELOCK_NOTIFICATION_ID, notification);
-	}
-
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState)
 	{
 		System.out.println("-- GrFlowGraphRunnerActivity: onCreate");
 		initialized = false;
-		super.onCreate(savedInstanceState);
-		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-		PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-		wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-		        "GrFlowGraphRunner::GrFlowGraphRunnerWakelockTag");
-
+		super.onCreate(savedInstanceState);		
 	}
 
 	@Override
@@ -135,11 +81,6 @@ public class GrFlowGraphRunnerActivity extends QtActivity
         @Override
 	protected void onResume()
 	{
-		cancelNotification(GRFLOWGRAPHRUNNER_WAKELOCK_NOTIFICATION_ID);
-		if (wakeLock.isHeld()) {
-			wakeLock.release();
-		}
-
 		super.onResume();
 	}
 
@@ -154,32 +95,10 @@ public class GrFlowGraphRunnerActivity extends QtActivity
 
 	protected void onDestroy(){
 		System.out.println("-- GrFlowGraphRunnerActivity: onDestroy ");
-		cancelNotification(GRFLOWGRAPHRUNNER_WAKELOCK_NOTIFICATION_ID);
-		if (wakeLock.isHeld()) {
-			wakeLock.release();
-		}
 		if(initialized) {
 			;
 		}
 
 		super.onDestroy();
-	}
-
-	public void restart() {
-		saveSessionJavaHelper();
-		System.out.println("-- GrFlowGraphRunnerActivity: Restarting ");
-		Context context = getApplicationContext();
-		PackageManager packageManager = context.getPackageManager();
-		Intent intent = packageManager.getLaunchIntentForPackage(context.getPackageName());
-		ComponentName componentName = intent.getComponent();
-		Intent mainIntent = Intent.makeRestartActivityTask(componentName);
-		context.startActivity(mainIntent);
-		Runtime.getRuntime().exit(0);
-	}
-
-
-        private void cancelNotification(int id){
-		NotificationManager nMgr = (NotificationManager) this.getSystemService(NotificationManager.class);
-		nMgr.cancel(id);
 	}
 }

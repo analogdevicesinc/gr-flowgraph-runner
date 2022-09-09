@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-#source android_scopy_keystore
+#source android_keystore
 
 SCOPY_GIT_TAG=$(git rev-parse --short HEAD)
 BUILD_TYPE="debug"
@@ -12,17 +12,17 @@ SIGN_SUFFIX="${BUILD_TYPE}"
 if [ "$2" == "--sign" ]; then
 	BUILD_TYPE="release"
 	SIGN_STATUS="signed"
-	SIGN_OPTS="--sign ./scopy-android-key.jks scopy $KEYSTOREPASSWORD"
+	SIGN_OPTS="--sign ./android-key.jks appname $KEYSTOREPASSWORD"
 	SIGN_SUFFIX="${BUILD_TYPE}-${SIGN_STATUS}"
 fi
 
 
 if [ "$1" == "apk" ]; then
-	DEPLOY_FILE_CMD="cp $QT_DEPLOY_OUTPUT_FOLDER/build/outputs/apk/${BUILD_TYPE}/*.apk ./scopy-${SCOPY_GIT_TAG}-${ABI}-${SIGN_SUFFIX}.${1}"
+	DEPLOY_FILE_CMD="cp $QT_DEPLOY_OUTPUT_FOLDER/build/outputs/apk/${BUILD_TYPE}/*.apk ./android_app-${SCOPY_GIT_TAG}-${ABI}-${SIGN_SUFFIX}.${1}"
 	# apk by default
 	OUT_FILE_OPTS=""
 elif [ "$1" == "aab" ]; then
-	DEPLOY_FILE_CMD="cp $QT_DEPLOY_OUTPUT_FOLDER/build/outputs/bundle/${BUILD_TYPE}/*.aab ./scopy-${SCOPY_GIT_TAG}-${SIGN_SUFFIX}.${1} "
+	DEPLOY_FILE_CMD="cp $QT_DEPLOY_OUTPUT_FOLDER/build/outputs/bundle/${BUILD_TYPE}/*.aab ./android_app-${SCOPY_GIT_TAG}-${SIGN_SUFFIX}.${1} "
 	OUT_FILE_OPTS="--aab"
 else
 	echo Required parameter -- $0 [apk/aab]
